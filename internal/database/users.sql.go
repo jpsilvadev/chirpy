@@ -13,14 +13,9 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
+
 INSERT INTO users (id, created_at, updated_at, email)
-VALUES (
-    $1,
-    $2,
-    $3,
-    $4
-)
-RETURNING id, created_at, updated_at, email
+VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at, email
 `
 
 type CreateUserParams struct {
@@ -45,4 +40,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 	)
 	return i, err
+}
+
+const deleteAllUsers = `-- name: DeleteAllUsers :exec
+
+DELETE
+FROM users
+`
+
+func (q *Queries) DeleteAllUsers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteAllUsers)
+	return err
 }
