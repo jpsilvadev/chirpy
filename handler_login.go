@@ -3,20 +3,28 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/jpsilvadev/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
-	decoder := json.NewDecoder(req.Body)
+
 	params := parameters{}
+	decoder := json.NewDecoder(req.Body)
 	if err := decoder.Decode(&params); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong decoding", err)
 		return
+	}
+
+	expiresIn := time.Hour
+	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
+		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
 	}
 
 	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
@@ -34,10 +42,24 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+
+	type loginResponse struct {
+		User
+		Token string `json:"token"`
+	}
+
+	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiresIn)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not create access token", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, loginResponse{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token: token,
 	})
 }

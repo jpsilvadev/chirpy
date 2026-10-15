@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jpsilvadev/chirpy/internal/auth"
 	"github.com/jpsilvadev/chirpy/internal/database"
 )
 
@@ -66,6 +67,18 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Reques
 		UserID uuid.UUID `json:"user_id"`
 	}
 
+	// check for valid JWT
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Failed to retrieve Bearer Token", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid JWT", err)
+		return
+	}
+
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
 	if err := decoder.Decode(&params); err != nil {
@@ -84,7 +97,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Reques
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Body:      cleanedBody,
-		UserID:    params.UserID,
+		UserID:    userID,
 	}
 	_, err = cfg.db.CreateChirp(req.Context(), chirpParams)
 	if err != nil {
