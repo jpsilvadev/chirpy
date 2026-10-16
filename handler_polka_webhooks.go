@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jpsilvadev/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, req *http.Request) {
@@ -15,6 +16,19 @@ func (cfg *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, req *http.Requ
 			UserID uuid.UUID `json:"user_id"`
 		} `json:"data"`
 	}
+
+	// ensure API Key is correct
+	APIKey, err := auth.GetAPIKey(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Failed to retrieve ApiKey", err)
+		return
+	}
+
+	if APIKey != cfg.polkaAPIKey {
+		respondWithError(w, http.StatusUnauthorized, "Invalid API Key", nil)
+		return
+	}
+
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
 	if err := decoder.Decode(&params); err != nil {
