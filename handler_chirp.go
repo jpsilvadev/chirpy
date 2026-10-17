@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,18 +22,19 @@ type Chirp struct {
 }
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, req *http.Request) {
-	s := req.URL.Query().Get("author_id")
+	authID := req.URL.Query().Get("author_id")
+	sortOrder := req.URL.Query().Get("sort")
 
 	var chirps []database.Chirp
 	var err error
-	if s == "" {
+	if authID == "" {
 		chirps, err = cfg.db.GetAllChirps(req.Context())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to get chirps", err)
 			return
 		}
 	} else {
-		authorUserID, err := uuid.Parse(s)
+		authorUserID, err := uuid.Parse(authID)
 		if err != nil {
 			respondWithError(w, http.StatusBadRequest, "Failed to parse chirp UUID", err)
 			return
@@ -54,6 +56,16 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, req *http.Reque
 			UserID:    c.UserID,
 		}
 	}
+	if sortOrder == "asc" {
+		sort.Slice(response, func(i, j int) bool {
+			return response[i].CreatedAt.Before(chirps[j].CreatedAt)
+		})
+	} else {
+		sort.Slice(response, func(i, j int) bool {
+			return response[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
+	}
+
 	respondWithJSON(w, http.StatusOK, response)
 }
 
