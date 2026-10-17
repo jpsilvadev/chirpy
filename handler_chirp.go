@@ -21,10 +21,27 @@ type Chirp struct {
 }
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, req *http.Request) {
-	chirps, err := cfg.db.GetAllChirps(req.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to get chirps", err)
-		return
+	s := req.URL.Query().Get("author_id")
+
+	var chirps []database.Chirp
+	var err error
+	if s == "" {
+		chirps, err = cfg.db.GetAllChirps(req.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to get chirps", err)
+			return
+		}
+	} else {
+		authorUserID, err := uuid.Parse(s)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Failed to parse chirp UUID", err)
+			return
+		}
+		chirps, err = cfg.db.GetChirpsByUserID(req.Context(), authorUserID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to get chirps", err)
+			return
+		}
 	}
 
 	response := make([]Chirp, len(chirps))
